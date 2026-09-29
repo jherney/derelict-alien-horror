@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DERELICT — Scary Edition</title>
+<title>DERELICT — v2</title>
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
   #overlay {
@@ -15,7 +15,7 @@
   @keyframes titleflicker {
     0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.2; } 94% { opacity: 1; } 96% { opacity: 0.4; } 97% { opacity: 1; }
   }
-  #overlay p { max-width: 560px; line-height: 1.7; color: #5c7a5c; }
+  #overlay p { max-width: 580px; line-height: 1.7; color: #5c7a5c; }
   #hud {
     position: absolute; top: 12px; left: 12px; z-index: 5; font-size: 15px;
     color: #7fa77f; text-shadow: 0 0 6px #0f0; display: none; line-height: 1.8;
@@ -23,9 +23,14 @@
   .bar { display: inline-block; width: 90px; height: 8px; border: 1px solid #466; vertical-align: middle; margin-left: 6px; }
   .bar > i { display: block; height: 100%; background: #6a8; transition: width 0.15s; }
   #fearbar > i { background: #a33; }
+  #breathbar > i { background: #8cf; }
   #msg {
-    position: absolute; bottom: 60px; width: 100%; text-align: center;
+    position: absolute; bottom: 78px; width: 100%; text-align: center;
     color: #fc6; font-size: 18px; z-index: 5; text-shadow: 0 0 8px #f80;
+  }
+  #prompt {
+    position: absolute; bottom: 108px; width: 100%; text-align: center;
+    color: #9db; font-size: 16px; z-index: 5; text-shadow: 0 0 6px #084; letter-spacing: 1px;
   }
   #crosshair {
     position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
@@ -43,78 +48,86 @@
   #damage {
     position: absolute; inset: 0; pointer-events: none; z-index: 6;
     background: radial-gradient(ellipse at center, transparent 35%, rgba(200,0,0,0.65) 100%);
-    opacity: 0; transition: opacity 0.1s;
+    opacity: 0;
   }
-  #flashblack {
-    position: absolute; inset: 0; pointer-events: none; z-index: 7;
-    background: #000; opacity: 0;
+  #flashblack { position: absolute; inset: 0; pointer-events: none; z-index: 7; background: #000; opacity: 0; }
+  #locker {
+    position: absolute; inset: 0; pointer-events: none; z-index: 8; display: none;
+    background:
+      linear-gradient(#050505, #050505) top / 100% 18% no-repeat,
+      linear-gradient(#050505, #050505) bottom / 100% 22% no-repeat,
+      repeating-linear-gradient(90deg, #050505 0 34px, transparent 34px 78px);
+    box-shadow: inset 0 0 90px #000;
   }
+  #tracker-wrap {
+    position: absolute; right: 16px; bottom: 16px; z-index: 5; display: none; text-align: center;
+  }
+  #tracker-wrap span { color: #6a6; font-size: 11px; letter-spacing: 2px; display: block; margin-bottom: 4px; }
+  #tracker { background: radial-gradient(circle, #031208 40%, #000 72%); border: 1px solid #163; border-radius: 8px; }
 </style>
 </head>
 <body>
 <div id="overlay">
   <h1>DERELICT</h1>
   <p>
-    Salvage log, USCSS <b>Ymir</b>. The crew picked up something on LV-881.
-    It isn't in the manifest. It doesn't show on infrared.
-    It learned the ship's layout faster than the people who built it.<br><br>
-    Recover <b>5 power cells</b>. The escape bay won't open without them.
-    It hunts by sound. It watches from the dark. If the lights die — <b>don't move</b>.
+    Salvage log, USCSS <b>Ymir</b>. Two decks. The vents connect them.
+    Lockers still seal. The motion tracker still works — and it is not quiet.<br><br>
+    Recover <b>5 power cells</b>. Two of them are on the upper deck.
+    If it gets close, <b>crouch</b>, kill the lamp, and <b>hide</b>. Hold your breath.
   </p>
   <p style="color:#8f6">
-    WASD — move &nbsp;|&nbsp; SHIFT — sprint &nbsp;|&nbsp; F — flashlight &nbsp;|&nbsp; 🎧 headphones strongly advised
+    WASD move · SHIFT sprint · C crouch · F lamp · E interact · T tracker · SPACE hold breath<br>
+    🎧 headphones strongly advised
   </p>
   <p style="color:#f66; margin-top:20px; font-size:20px;">► CLICK TO BEGIN ◄</p>
 </div>
 <div id="hud">
   ▣ CELLS: <span id="cells">0</span>/5<br>
-  ▣ LAMP: <span id="lamp">ON</span><br>
+  ▣ DECK: <span id="deck">LOWER</span><br>
+  ▣ LAMP: <span id="lamp">ON</span> · <span id="stance">STAND</span><br>
+  ▣ TRACKER: <span id="track">ON</span><br>
   ▣ STAMINA<span class="bar"><i id="stambar" style="width:100%"></i></span><br>
   ▣ DREAD<span class="bar" id="fearbar"><i id="fearfill" style="width:0%"></i></span><br>
+  ▣ BREATH<span class="bar" id="breathwrap"><i id="breathfill" style="width:100%"></i></span><br>
   ▣ PROXIMITY: <span id="prox">—</span>
 </div>
 <div id="msg"></div>
+<div id="prompt"></div>
 <div id="crosshair"></div>
 <div id="vignette"></div>
 <div id="scanlines"></div>
 <div id="damage"></div>
 <div id="flashblack"></div>
+<div id="locker"></div>
+<div id="tracker-wrap"><span>MOTION TRACKER</span><canvas id="tracker" width="168" height="168"></canvas></div>
 
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
-
 <script type="module">
 import * as THREE from 'three';
 
-// ---------- Renderer / Scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
-
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
-scene.fog = new THREE.FogExp2(0x000000, 0.13);
+scene.fog = new THREE.FogExp2(0x000000, 0.105);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 80);
 
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 100);
-
-// ---------- Audio ----------
 const AC = new (window.AudioContext || window.webkitAudioContext)();
 const master = AC.createGain();
 master.gain.value = 0.9;
 master.connect(AC.destination);
-
-function noiseBuffer(sec = 1) {
+function noiseBuffer(sec = 2) {
   const buf = AC.createBuffer(1, AC.sampleRate * sec, AC.sampleRate);
   const d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   return buf;
 }
-const NOISE = noiseBuffer(2);
-
+const NOISE = noiseBuffer();
 function drone() {
   const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g = AC.createGain();
   o1.type = 'sine'; o1.frequency.value = 44;
@@ -129,7 +142,6 @@ function drone() {
   g.connect(lp).connect(master);
   o1.start(); o2.start(); lfo.start();
 }
-// persistent vent hiss routed through a panner (reused as alien presence cue)
 const ventPanner = AC.createStereoPanner();
 const ventGain = AC.createGain(); ventGain.gain.value = 0.012;
 {
@@ -137,6 +149,14 @@ const ventGain = AC.createGain(); ventGain.gain.value = 0.012;
   const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5400;
   s.connect(bp).connect(ventGain).connect(ventPanner).connect(master);
   s.start();
+}
+function tone(freq, vol, dur, type = 'sine') {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+  o.connect(g).connect(master);
+  o.start(); o.stop(AC.currentTime + dur + 0.02);
 }
 function screech(vol = 0.16) {
   const o = AC.createOscillator(), g = AC.createGain();
@@ -147,11 +167,7 @@ function screech(vol = 0.16) {
   g.gain.setValueAtTime(0.0001, AC.currentTime);
   g.gain.exponentialRampToValueAtTime(vol, AC.currentTime + 0.05);
   g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.7);
-  const dist = AC.createWaveShaper();
-  const curve = new Float32Array(256);
-  for (let i = 0; i < 256; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(x * 6); }
-  dist.curve = curve;
-  o.connect(dist).connect(g).connect(master);
+  o.connect(g).connect(master);
   o.start(); o.stop(AC.currentTime + 0.8);
 }
 function deepBoom(vol = 0.35) {
@@ -168,455 +184,464 @@ function heartbeat(rate) {
   const beat = (d) => {
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = 'sine'; o.frequency.value = 52;
-    g.gain.setValueAtTime(0.55, AC.currentTime + d);
+    g.gain.setValueAtTime(0.5, AC.currentTime + d);
     g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + d + 0.2);
     o.connect(g).connect(master);
     o.start(AC.currentTime + d); o.stop(AC.currentTime + d + 0.22);
   };
   beat(0); beat(rate * 0.32);
 }
-function pickupSfx() {
-  const o = AC.createOscillator(), g = AC.createGain();
-  o.type = 'square';
-  o.frequency.setValueAtTime(330, AC.currentTime);
-  o.frequency.setValueAtTime(495, AC.currentTime + 0.1);
-  g.gain.value = 0.07;
-  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.35);
-  o.connect(g).connect(master);
-  o.start(); o.stop(AC.currentTime + 0.35);
-}
-// alien clicking footstep — panned by its real position
+function pickupSfx() { tone(330, 0.07, 0.12, 'square'); setTimeout(() => tone(495, 0.06, 0.2, 'square'), 90); }
+function trackerBeep(close) { tone(close ? 920 : 640, close ? 0.045 : 0.03, 0.06, 'sine'); }
 function alienClick(dist, pan) {
   const s = AC.createBufferSource(); s.buffer = NOISE;
   s.playbackRate.value = 2.4 + Math.random() * 1.2;
   const g = AC.createGain();
-  const vol = Math.min(0.22, 1.6 / Math.max(1, dist * dist));
-  g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.setValueAtTime(Math.min(0.22, 1.6 / Math.max(1, dist * dist)), AC.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.06);
   const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3000 + Math.random() * 2000; bp.Q.value = 4;
-  const p = AC.createStereoPanner(); p.pan.value = pan;
+  const p = AC.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
   s.connect(bp).connect(g).connect(p).connect(master);
-  s.start(AC.currentTime, Math.random() * 1.5, 0.08);
+  s.start(AC.currentTime, Math.random(), 0.08);
 }
-// skitter: many clicks sweeping across the stereo field
 function skitter(fromPan, toPan) {
-  let pan = fromPan;
+  let pan = fromPan, n = 0;
   const step = () => {
     alienClick(2.5, pan);
-    pan += (toPan - fromPan) / 14;
-    if (Math.abs(pan - toPan) > 0.05) setTimeout(step, 45 + Math.random() * 60);
+    pan += (toPan - fromPan) / 12;
+    if (++n < 12) setTimeout(step, 40 + Math.random() * 50);
   };
   step();
 }
-// reversed-style whisper
 function whisper(pan, vol = 0.09) {
-  const s = AC.createBufferSource(); s.buffer = NOISE;
-  s.playbackRate.value = 0.32;
-  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 8;
-  const bp2 = AC.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 1600; bp2.Q.value = 10;
+  const s = AC.createBufferSource(); s.buffer = NOISE; s.playbackRate.value = 0.32;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 6;
   const g = AC.createGain();
   const t0 = AC.currentTime;
   g.gain.setValueAtTime(0.0001, t0);
-  for (let i = 0; i < 8; i++) {
-    const t = t0 + i * 0.28 + Math.random() * 0.1;
-    g.gain.exponentialRampToValueAtTime(vol * (0.5 + Math.random() * 0.5), t + 0.1);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+  for (let i = 0; i < 6; i++) {
+    const t = t0 + i * 0.3;
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
   }
-  const p = AC.createStereoPanner(); p.pan.value = pan;
-  s.connect(bp).connect(g);
-  bp.connect(bp2).disconnect();
-  const g2 = AC.createGain(); g2.gain.value = 0.0001;
-  bp.connect(g2); g2.gain.setValueAtTime(vol * 0.7, t0);
-  g.connect(p).connect(master); g2.connect(p);
-  s.start(); s.stop(t0 + 2.8);
+  const p = AC.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
+  s.connect(bp).connect(g).connect(p).connect(master);
+  s.start(); s.stop(t0 + 2.2);
 }
-// heavy breathing when exhausted / terrified
 function breath(harsh) {
-  const s = AC.createBufferSource(); s.buffer = NOISE;
-  s.playbackRate.value = 0.55;
+  const s = AC.createBufferSource(); s.buffer = NOISE; s.playbackRate.value = 0.55;
   const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 1.6;
   const g = AC.createGain();
   const t0 = AC.currentTime;
-  const v = harsh ? 0.05 : 0.02;
+  const v = harsh ? 0.05 : 0.018;
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(v, t0 + 0.4);            // inhale
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.0);
-  g.gain.exponentialRampToValueAtTime(v * 1.3, t0 + 1.5);       // exhale
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.2);
+  g.gain.exponentialRampToValueAtTime(v, t0 + 0.35);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+  g.gain.exponentialRampToValueAtTime(v * 1.3, t0 + 1.4);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.1);
   s.connect(bp).connect(g).connect(master);
-  s.start(t0); s.stop(t0 + 2.3);
+  s.start(t0); s.stop(t0 + 2.2);
 }
-function klaxonThump() {
-  const o = AC.createOscillator(), g = AC.createGain();
-  o.type = 'square'; o.frequency.value = 96;
-  g.gain.setValueAtTime(0.06, AC.currentTime);
-  g.gain.setValueAtTime(0.06, AC.currentTime + 0.14);
-  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.16);
-  o.connect(g).connect(master);
-  o.start(); o.stop(AC.currentTime + 0.2);
-}
+function klaxonThump() { tone(96, 0.05, 0.14, 'square'); }
 
-// ---------- Ship Layout ----------
-const MAP = [
-  [0,0,0,0,0,0,0,0,0],
-  [0,1,1,1,0,1,1,1,0],
-  [0,1,0,1,0,1,0,1,0],
-  [0,1,0,1,1,1,0,1,0],
-  [0,1,0,0,1,0,0,1,0],
-  [0,1,0,1,1,1,0,1,0],
-  [0,1,0,1,0,1,0,1,0],
-  [0,1,1,1,1,1,1,1,0],
-  [0,0,0,0,0,0,0,0,0],
+const MAPS = [
+  [
+    [0,0,0,0,0,0,0,0,0],
+    [0,1,1,1,0,1,1,1,0],
+    [0,1,0,1,0,1,0,1,0],
+    [0,1,0,1,1,1,0,1,0],
+    [0,1,0,0,1,0,0,1,0],
+    [0,1,0,1,1,1,0,1,0],
+    [0,1,0,1,0,1,0,1,0],
+    [0,1,1,1,1,1,1,1,0],
+    [0,0,0,0,0,0,0,0,0],
+  ],
+  [
+    [0,0,0,0,0,0,0,0,0],
+    [0,1,1,0,1,1,0,1,0],
+    [0,1,1,1,1,1,1,1,0],
+    [0,0,1,0,1,0,1,0,0],
+    [0,1,1,1,1,1,1,1,0],
+    [0,1,0,1,0,1,0,1,0],
+    [0,1,1,1,1,1,0,1,0],
+    [0,1,0,1,1,1,1,1,0],
+    [0,0,0,0,0,0,0,0,0],
+  ],
 ];
-const CELL = 8, ROWS = MAP.length, COLS = MAP[0].length;
-function tileAt(c, r) {
-  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
-  return MAP[r][c];
+const CELL = 8, ROWS = 9, COLS = 9, DECK_H = 5.2, WALL_H = 3.4;
+const STAIRS = [[4, 4], [3, 7]];
+function tileAt(deck, c, r) {
+  if (deck < 0 || deck > 1 || r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
+  return MAPS[deck][r][c];
 }
-function tileAtWorld(x, z) {
-  const c = Math.floor((x + COLS * CELL / 2) / CELL);
-  const r = Math.floor((z + ROWS * CELL / 2) / ROWS === 0 ? 1 : 1) ; // guard
-  return tileAt(c, Math.floor((z + ROWS * CELL / 2) / CELL));
-}
+function isStair(c, r) { return STAIRS.some(([sc, sr]) => sc === c && sr === r); }
 function worldOf(c, r) {
   return { x: (c + 0.5) * CELL - COLS * CELL / 2, z: (r + 0.5) * CELL - ROWS * CELL / 2 };
 }
+function gridOf(x, z) {
+  return {
+    c: Math.floor((x + COLS * CELL / 2) / CELL),
+    r: Math.floor((z + ROWS * CELL / 2) / CELL),
+  };
+}
 
-const WALL_H = 3.4;
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.9, metalness: 0.35 });
-const wallMat2 = new THREE.MeshStandardMaterial({ color: 0x1b1f22, roughness: 1, metalness: 0.25 });
+const wallMatB = new THREE.MeshStandardMaterial({ color: 0x241c1c, roughness: 0.95, metalness: 0.25 });
 const floorMat = new THREE.MeshStandardMaterial({ color: 0x14171a, roughness: 0.7, metalness: 0.5 });
-
-const floorGeo = new THREE.PlaneGeometry(COLS * CELL, ROWS * CELL);
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
-const ceil = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({ color: 0x0d0f11, roughness: 1 }));
-ceil.rotation.x = Math.PI / 2;
-ceil.position.y = WALL_H;
-scene.add(ceil);
-
-const wallGeo = new THREE.BoxGeometry(CELL, WALL_H, 0.6);
-const stripGeo = new THREE.BoxGeometry(CELL, 0.14, 0.06);
 const stripMat = new THREE.MeshStandardMaterial({ color: 0x0a0c0d, emissive: 0xff2200, emissiveIntensity: 0.7 });
-const graffitiWallSpots = [];
-for (let r = 0; r < ROWS; r++) {
-  for (let c = 0; c < COLS; c++) {
-    if (tileAt(c, r) !== 1) continue;
+const stairMat = new THREE.MeshStandardMaterial({ color: 0x111100, emissive: 0xccaa22, emissiveIntensity: 0.8 });
+const grateMat = new THREE.MeshStandardMaterial({ color: 0x111411, emissive: 0x114422, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.7 });
+const lockerMat = new THREE.MeshStandardMaterial({ color: 0x2a3034, roughness: 0.45, metalness: 0.7 });
+const crateMat = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.95 });
+
+scene.add(new THREE.AmbientLight(0x0a0c14, 1.5));
+const flickers = [];
+const crates = [];
+const graffitiSpots = [];
+
+function buildDeck(deck) {
+  const y0 = deck * DECK_H;
+  const mat = deck === 0 ? wallMat : wallMatB;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(COLS * CELL, ROWS * CELL), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = y0;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(COLS * CELL, ROWS * CELL), new THREE.MeshStandardMaterial({ color: 0x0d0f11, roughness: 1 }));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = y0 + WALL_H;
+  scene.add(ceil);
+  const wallGeo = new THREE.BoxGeometry(CELL, WALL_H, 0.55);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (tileAt(deck, c, r) !== 1) continue;
     const p = worldOf(c, r);
     const dirs = [
       { dc: 0, dr: -1, ox: 0, oz: -CELL / 2, ry: 0 },
-      { dc: 0, dr: 1,  ox: 0, oz:  CELL / 2, ry: Math.PI },
+      { dc: 0, dr: 1, ox: 0, oz: CELL / 2, ry: Math.PI },
       { dc: -1, dr: 0, ox: -CELL / 2, oz: 0, ry: Math.PI / 2 },
-      { dc: 1, dr: 0,  ox:  CELL / 2, oz: 0, ry: -Math.PI / 2 },
+      { dc: 1, dr: 0, ox: CELL / 2, oz: 0, ry: -Math.PI / 2 },
     ];
     for (const d of dirs) {
-      if (tileAt(c + d.dc, r + d.dr) === 0) {
-        const w = new THREE.Mesh(wallGeo, Math.random() < 0.5 ? wallMat : wallMat2);
-        w.position.set(p.x + d.ox, WALL_H / 2, p.z + d.oz);
+      if (tileAt(deck, c + d.dc, r + d.dr) === 0) {
+        const w = new THREE.Mesh(wallGeo, mat);
+        w.position.set(p.x + d.ox, y0 + WALL_H / 2, p.z + d.oz);
         w.rotation.y = d.ry;
         w.castShadow = w.receiveShadow = true;
         scene.add(w);
-        graffitiWallSpots.push({ x: p.x + d.ox * 0.94, z: p.z + d.oz * 0.94, ry: d.ry });
-        if (Math.random() < 0.4) {
-          const s = new THREE.Mesh(stripGeo, stripMat);
-          s.position.set(p.x + d.ox * 0.93, 2.45, p.z + d.oz * 0.93);
+        graffitiSpots.push({ x: p.x + d.ox * 0.94, z: p.z + d.oz * 0.94, y: y0 + 1.7, ry: d.ry, deck });
+        if (Math.random() < 0.35) {
+          const s = new THREE.Mesh(new THREE.BoxGeometry(CELL * 0.8, 0.12, 0.06), stripMat);
+          s.position.set(p.x + d.ox * 0.93, y0 + 2.4, p.z + d.oz * 0.93);
           s.rotation.y = d.ry;
           scene.add(s);
         }
       }
     }
+    if ((r + c) % 2 === 0) {
+      const pt = new THREE.PointLight(deck === 0 ? 0x7788aa : 0x886666, 2.4, CELL * 1.25, 1.8);
+      pt.position.set(p.x, y0 + WALL_H - 0.35, p.z);
+      scene.add(pt);
+      flickers.push({ light: pt, base: 2.4, t: Math.random() * 10, dead: Math.random() < 0.22 });
+    }
+    if (tileAt(deck, c, r) === 1 && Math.random() < 0.12 && !isStair(c, r)) {
+      const size = 1 + Math.random() * 1.2;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
+      m.position.set(p.x + (Math.random() - 0.5) * 3.2, y0 + size / 2, p.z + (Math.random() - 0.5) * 3.2);
+      m.rotation.y = Math.random() * 0.4;
+      m.castShadow = m.receiveShadow = true;
+      scene.add(m);
+      crates.push({ mesh: m, deck, half: size / 2 + 0.35 });
+    }
   }
 }
+buildDeck(0);
+buildDeck(1);
 
-// Bloody graffiti: "IT KNOWS"
 function graffitiTexture(text) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 256;
   const g = cv.getContext('2d');
-  g.fillStyle = 'rgba(0,0,0,0)';
   g.clearRect(0, 0, 512, 256);
   g.fillStyle = '#7a0f0f';
-  g.font = 'bold 90px Courier New';
+  g.font = 'bold 78px Courier New';
   g.textAlign = 'center';
-  g.save();
-  g.translate(256, 128);
-  g.rotate((Math.random() - 0.5) * 0.15);
-  g.fillText(text, 0, 30);
-  g.restore();
-  // drips
-  for (let i = 0; i < 26; i++) {
-    const x = 100 + Math.random() * 320;
-    const len = 10 + Math.random() * 60;
-    g.fillRect(x, 130 + Math.random() * 20, 3, len);
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  return tex;
+  g.fillText(text, 256, 120);
+  for (let i = 0; i < 18; i++) g.fillRect(90 + Math.random() * 330, 130, 3, 12 + Math.random() * 50);
+  return new THREE.CanvasTexture(cv);
 }
-for (const [text, idx] of [[ 'IT KNOWS', 0 ], [ 'DONT RUN', Math.floor(graffitiWallSpots.length * 0.45) ], [ 'IT LEARNS', graffitiWallSpots.length - 2 ]]) {
-  const spot = graffitiWallSpots[idx];
-  if (!spot) continue;
-  const pl = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.6, 2.8),
-    new THREE.MeshStandardMaterial({ map: graffitiTexture(text), transparent: true, roughness: 1 })
-  );
-  pl.position.set(spot.x, 1.7, spot.z);
+const lines = ['IT KNOWS', 'DONT RUN', 'THE VENTS', 'ABOVE YOU', 'IT LEARNS'];
+graffitiSpots.filter((_, i) => i % 11 === 0).slice(0, 5).forEach((spot, i) => {
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.4), new THREE.MeshStandardMaterial({ map: graffitiTexture(lines[i] || 'RUN'), transparent: true, roughness: 1 }));
+  pl.position.set(spot.x, spot.y, spot.z);
   pl.rotation.y = spot.ry;
   scene.add(pl);
-}
+});
 
-// Blood pools
-const bloodMat = new THREE.MeshStandardMaterial({ color: 0x2a0505, roughness: 0.35, metalness: 0.15 });
-for (let i = 0; i < 10; i++) {
+const bloodMat = new THREE.MeshStandardMaterial({ color: 0x2a0505, roughness: 0.35 });
+for (let i = 0; i < 8; i++) {
+  const deck = i < 5 ? 0 : 1;
   let c, r;
-  do { c = 1 + Math.floor(Math.random() * 7); r = 1 + Math.floor(Math.random() * 7); } while (tileAt(c, r) !== 1);
+  do { c = 1 + Math.floor(Math.random() * 7); r = 1 + Math.floor(Math.random() * 7); } while (tileAt(deck, c, r) !== 1);
   const p = worldOf(c, r);
-  const b = new THREE.Mesh(new THREE.CircleGeometry(0.5 + Math.random() * 1.3, 14), bloodMat);
+  const b = new THREE.Mesh(new THREE.CircleGeometry(0.45 + Math.random(), 12), bloodMat);
   b.rotation.x = -Math.PI / 2;
-  b.position.set(p.x + (Math.random() - 0.5) * 4, 0.012, p.z + (Math.random() - 0.5) * 4);
-  b.scale.x = 0.6 + Math.random();
-  b.rotation.z = Math.random() * Math.PI;
+  b.position.set(p.x + (Math.random() - 0.5) * 3, deck * DECK_H + 0.02, p.z + (Math.random() - 0.5) * 3);
   scene.add(b);
 }
-// Crew remains
-const boneMat = new THREE.MeshStandardMaterial({ color: 0xb8a898, roughness: 0.85 });
-for (let i = 0; i < 3; i++) {
-  let c, r;
-  do { c = 1 + Math.floor(Math.random() * 7); r = 1 + Math.floor(Math.random() * 7); } while (tileAt(c, r) !== 1);
+
+for (const [c, r] of STAIRS) {
   const p = worldOf(c, r);
-  const body = new THREE.Group();
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.9, 4, 8), boneMat);
-  torso.rotation.z = Math.PI / 2 + (Math.random() - 0.5) * 0.4;
-  torso.position.y = 0.22;
-  body.add(torso);
-  for (let l = 0; l < 4; l++) {
-    const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.7, 3, 6), boneMat);
-    limb.position.set((Math.random() - 0.5) * 0.9, 0.1, (Math.random() - 0.5) * 1.2);
-    limb.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, Math.PI / 2 + (Math.random() - 0.5));
-    body.add(limb);
-  }
-  body.position.set(p.x + (Math.random() - 0.5) * 3, 0, p.z + (Math.random() - 0.5) * 3);
-  body.rotation.y = Math.random() * Math.PI * 2;
-  scene.add(body);
-}
-
-// Crates
-const crateMat = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.95 });
-const crates = [];
-for (let r = 1; r < ROWS - 1; r++) for (let c = 1; c < COLS - 1; c++) {
-  if (tileAt(c, r) === 1 && Math.random() < 0.24) {
-    const size = 1 + Math.random() * 1.4;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
-    const p = worldOf(c, r);
-    m.position.set(p.x + (Math.random() - 0.5) * (CELL - 4), size / 2, p.z + (Math.random() - 0.5) * (CELL - 4));
-    m.rotation.y = Math.random() * Math.PI;
-    m.castShadow = m.receiveShadow = true;
-    scene.add(m);
-    crates.push(m);
+  const col = new THREE.Mesh(new THREE.BoxGeometry(0.35, DECK_H, 0.35), stairMat);
+  col.position.set(p.x, DECK_H / 2, p.z);
+  scene.add(col);
+  for (const deck of [0, 1]) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.25, 18), stairMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(p.x, deck * DECK_H + 0.04, p.z);
+    scene.add(ring);
+    const lamp = new THREE.PointLight(0xccaa22, 1.4, 6, 2);
+    lamp.position.set(p.x, deck * DECK_H + 1.4, p.z);
+    scene.add(lamp);
   }
 }
 
-// ---------- Lighting ----------
-scene.add(new THREE.AmbientLight(0x0a0c14, 1.4));
-const flickers = [];
-const glowMat = new THREE.MeshStandardMaterial({ color: 0x0c0c10, emissive: 0x99aadd, emissiveIntensity: 0.8 });
-for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-  if (tileAt(c, r) === 1 && (r + c) % 2 === 0) {
-    const p = worldOf(c, r);
-    const pt = new THREE.PointLight(0x7788aa, 2.6, CELL * 1.3, 1.8);
-    pt.position.set(p.x, WALL_H - 0.4, p.z);
-    scene.add(pt);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.6), glowMat);
-    panel.rotation.x = Math.PI / 2;
-    panel.position.set(p.x, WALL_H - 0.02, p.z);
-    scene.add(panel);
-    flickers.push({ light: pt, base: 2.6, t: Math.random() * 10, dead: Math.random() < 0.25 });
+const VENT_DEFS = [
+  [{ deck: 0, c: 1, r: 1 }, { deck: 0, c: 7, r: 1 }],
+  [{ deck: 0, c: 1, r: 7 }, { deck: 1, c: 1, r: 1 }],
+  [{ deck: 0, c: 7, r: 7 }, { deck: 1, c: 7, r: 7 }],
+  [{ deck: 1, c: 4, r: 1 }, { deck: 1, c: 7, r: 4 }],
+];
+const vents = [];
+let ventId = 0;
+for (const pair of VENT_DEFS) {
+  const id = ventId++;
+  for (const end of pair) {
+    const p = worldOf(end.c, end.r);
+    const g = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 0.12), grateMat);
+    g.position.set(p.x, end.deck * DECK_H + 1.1, p.z + 2.4);
+    scene.add(g);
+    vents.push({ id, deck: end.deck, c: end.c, r: end.r, x: p.x, z: p.z, mesh: g });
   }
 }
-// klaxon light chases the player during hunts
-const klaxon = new THREE.PointLight(0xff1100, 0, 18, 1.5);
-scene.add(klaxon);
+function otherVent(v) { return vents.find(o => o.id === v.id && o !== v); }
 
-// Flashlight — tighter, colder
-const flash = new THREE.SpotLight(0xfff6e0, 18, 30, Math.PI / 9, 0.55, 1.5);
-flash.castShadow = true;
-flash.shadow.mapSize.set(1024, 1024);
-camera.add(flash);
-camera.add(flash.target);
-flash.position.set(0, 0, 0.1);
-flash.target.position.set(0, -0.08, -1);
-let lampOn = true;
+const lockers = [];
+const LOCKER_DEFS = [
+  { deck: 0, c: 5, r: 3, yaw: 0 },
+  { deck: 0, c: 6, r: 1, yaw: Math.PI },
+  { deck: 1, c: 6, r: 2, yaw: Math.PI / 2 },
+  { deck: 1, c: 5, r: 6, yaw: -Math.PI / 2 },
+];
+for (const def of LOCKER_DEFS) {
+  if (tileAt(def.deck, def.c, def.r) !== 1) continue;
+  const p = worldOf(def.c, def.r);
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.15, 0.7), lockerMat);
+  body.position.y = 1.08;
+  body.castShadow = true;
+  g.add(body);
+  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.04), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x223322, emissiveIntensity: 0.4 }));
+  slit.position.set(0, 1.55, 0.36);
+  g.add(slit);
+  g.position.set(p.x + Math.sin(def.yaw) * 1.6, def.deck * DECK_H, p.z + Math.cos(def.yaw) * 1.6);
+  g.rotation.y = def.yaw;
+  scene.add(g);
+  lockers.push({ ...def, x: g.position.x, z: g.position.z, group: g });
+}
 
-// ---------- Power cells ----------
 const cellMat = new THREE.MeshStandardMaterial({ color: 0x002211, emissive: 0x00ff88, emissiveIntensity: 1.4 });
 const cells = [];
-const cellTiles = [[1,1],[7,1],[1,7],[7,7],[4,2]];
-for (const [c, r] of cellTiles) {
-  const p = worldOf(c, r);
+for (const def of [
+  { deck: 0, c: 1, r: 1 }, { deck: 0, c: 7, r: 1 }, { deck: 0, c: 1, r: 7 },
+  { deck: 1, c: 2, r: 2 }, { deck: 1, c: 7, r: 7 },
+]) {
+  const p = worldOf(def.c, def.r);
   const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 0), cellMat);
-  m.position.set(p.x + 2, 1.1, p.z + 1);
+  m.position.set(p.x + 1.4, def.deck * DECK_H + 1.1, p.z - 1.1);
   scene.add(m);
   const light = new THREE.PointLight(0x00ff88, 2, 5, 2);
   light.position.copy(m.position);
   scene.add(light);
-  cells.push({ mesh: m, light, got: false, t: Math.random() * 6 });
+  cells.push({ mesh: m, light, got: false, t: Math.random() * 6, deck: def.deck });
 }
 
-// ---------- Exit ----------
 const exitP = worldOf(4, 7);
-const exitMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0xff2200, emissiveIntensity: 1.0 });
-const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(4, 3.4, 0.4), exitMat);
-exitDoor.position.set(exitP.x, 1.7, exitP.z + CELL / 2 - 0.4);
+const exitMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0xff2200, emissiveIntensity: 1 });
+const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 0.35), exitMat);
+exitDoor.position.set(exitP.x, 1.6, exitP.z + CELL / 2 - 0.5);
 scene.add(exitDoor);
 const exitLight = new THREE.PointLight(0xff2200, 2.2, 7, 2);
-exitLight.position.set(exitP.x, 2.2, exitP.z + CELL / 2 - 1.5);
+exitLight.position.set(exitP.x, 2.2, exitP.z + 2);
 scene.add(exitLight);
 
-// ---------- Alien ----------
-const alienGroup = new THREE.Group();
-const bodyMat = new THREE.MeshStandardMaterial({ color: 0x090a09, roughness: 0.3, metalness: 0.65 });
-const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.15, 4, 10), bodyMat);
-torso.position.y = 1.5; torso.rotation.x = 0.5;
-alienGroup.add(torso);
-const headGrp = new THREE.Group();
-const skull = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.9, 4, 10), bodyMat);
-skull.rotation.x = Math.PI / 2.15;
-headGrp.add(skull);
-const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 3.0 });
-for (const sx of [-0.1, 0.1]) {
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
-  eye.position.set(sx, 0.02, 0.42);
-  headGrp.add(eye);
-}
-// jaw
-const jaw = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.5, 6), new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.4 }));
-jaw.position.set(0, -0.16, 0.35);
-jaw.rotation.x = 2.6;
-headGrp.add(jaw);
-headGrp.position.set(0, 2.25, 0.45);
-alienGroup.add(headGrp);
-const limbGeo = new THREE.CapsuleGeometry(0.085, 0.9, 3, 6);
-const limbs = [];
-for (const [x, y, z] of [[-0.45, 1.7, 0.15],[0.45, 1.7, 0.15],[-0.2, 0.6, -0.1],[0.2, 0.6, -0.1]]) {
-  const l = new THREE.Mesh(limbGeo, bodyMat);
-  l.position.set(x, y, z);
-  l.rotation.z = x > 0 ? 0.35 : -0.35;
-  alienGroup.add(l);
-  limbs.push(l);
-}
-const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 1.7, 3, 6), bodyMat);
-tail.position.set(0, 1.3, -0.95);
-tail.rotation.x = -1.15;
-alienGroup.add(tail);
-const alienSpawn = worldOf(1, 7);
-alienGroup.position.set(alienSpawn.x, 0, alienSpawn.z);
-scene.add(alienGroup);
+const klaxon = new THREE.PointLight(0xff1100, 0, 16, 1.5);
+scene.add(klaxon);
+const flash = new THREE.SpotLight(0xfff6e0, 20, 32, Math.PI / 8, 0.5, 1.4);
+flash.castShadow = true;
+camera.add(flash);
+camera.add(flash.target);
+flash.position.set(0, 0, 0.1);
+flash.target.position.set(0, -0.06, -1);
+let lampOn = true;
 
-// Hallucination shadow (fake alien that flickers into view)
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+function makeAlien() {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x090a09, roughness: 0.3, metalness: 0.65 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.15, 4, 10), bodyMat);
+  torso.position.y = 1.5; torso.rotation.x = 0.45;
+  group.add(torso);
+  const headGrp = new THREE.Group();
+  const skull = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.9, 4, 10), bodyMat);
+  skull.rotation.x = Math.PI / 2.15;
+  headGrp.add(skull);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 3 });
+  for (const sx of [-0.1, 0.1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
+    eye.position.set(sx, 0.02, 0.42);
+    headGrp.add(eye);
+  }
+  headGrp.position.set(0, 2.25, 0.4);
+  group.add(headGrp);
+  const limbs = [];
+  for (const [x, y, z] of [[-0.45, 1.7, 0.15], [0.45, 1.7, 0.15], [-0.2, 0.55, -0.05], [0.2, 0.55, -0.05]]) {
+    const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.9, 3, 6), bodyMat);
+    l.position.set(x, y, z);
+    l.rotation.z = x > 0 ? 0.3 : -0.3;
+    group.add(l);
+    limbs.push(l);
+  }
+  const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 1.6, 3, 6), bodyMat);
+  tail.position.set(0, 1.25, -0.9);
+  tail.rotation.x = -1.1;
+  group.add(tail);
+  scene.add(group);
+  return { group, limbs, headGrp, eyeMat, tail };
+}
+const alienMesh = makeAlien();
+const alienSpawn = worldOf(7, 4);
+alienMesh.group.position.set(alienSpawn.x, DECK_H, alienSpawn.z);
+
 const shadowAlien = new THREE.Group();
-const shTorso = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.3, 4, 8), shadowMat);
-shTorso.position.y = 1.4;
-shadowAlien.add(shTorso);
-const shHead = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.9, 4, 8), shadowMat);
-shHead.position.set(0, 2.3, 0.4);
-shHead.rotation.x = Math.PI / 2.2;
-shadowAlien.add(shHead);
+shadowAlien.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.2, 4, 8), new THREE.MeshBasicMaterial({ color: 0x000000 })));
 shadowAlien.visible = false;
 scene.add(shadowAlien);
 
-// ---------- Player ----------
 const player = {
-  pos: new THREE.Vector3(worldOf(4, 3).x, 1.62, worldOf(4, 3).z),
-  yaw: 0, pitch: 0, noise: 0,
-  stamina: 100, fear: 0,
-  breathT: 0,
+  pos: new THREE.Vector3(worldOf(4, 3).x, 0, worldOf(4, 3).z),
+  yaw: 0, pitch: 0, deck: 0, noise: 0.1,
+  stamina: 100, fear: 0, breathHold: 5.5, breathT: 1,
+  crouch: false, crouchBlend: 0,
+  hiding: null, holdingBreath: false, exposedT: 0,
+  ventT: 0, ventTo: null, fade: 0,
 };
 const keys = {};
+let trackerOn = true;
 addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (e.code === 'KeyF' && started && !dead && !won) {
+  if (e.repeat || !started || dead || won || !locked()) return;
+  if (e.code === 'KeyF') {
     lampOn = !lampOn;
-    flash.intensity = lampOn ? 18 : 0;
     document.getElementById('lamp').textContent = lampOn ? 'ON' : 'OFF';
-    alienClick(4, (Math.random() - 0.5)); // the switch click may give you away
-    player.noise = Math.min(1, player.noise + 0.3);
+    alienClick(5, (Math.random() - 0.5));
+    player.noise = Math.min(1, player.noise + 0.28);
   }
+  if (e.code === 'KeyT') {
+    trackerOn = !trackerOn;
+    document.getElementById('track').textContent = trackerOn ? 'ON' : 'OFF';
+    document.getElementById('tracker-wrap').style.opacity = trackerOn ? '1' : '0.35';
+  }
+  if (e.code === 'KeyC') player.crouch = !player.crouch;
+  if (e.code === 'KeyE') interact();
 });
-addEventListener('keyup', e => keys[e.code] = false);
+addEventListener('keyup', e => { keys[e.code] = false; });
 
 const overlay = document.getElementById('overlay');
 let started = false, dead = false, won = false, dying = false, startedAt = 0;
-const overlayHTML = overlay.innerHTML;
+function locked() { return document.pointerLockElement === renderer.domElement; }
 overlay.addEventListener('click', () => {
-  if (!started) { started = true; AC.resume(); drone(); startedAt = performance.now(); }
+  if (dead || won) return;
+  if (!started) { started = true; AC.resume(); drone(); startedAt = performance.now(); setTimeout(() => setMsg('T toggles the tracker. It beeps. It can hear that.', 4200), 1200); }
   renderer.domElement.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
-  const locked = document.pointerLockElement === renderer.domElement;
-  document.getElementById('hud').style.display = (started && locked && !dead && !won) ? 'block' : 'none';
-  document.getElementById('crosshair').style.display = (started && locked) ? 'block' : 'none';
-  if (locked) overlay.style.display = 'none';
+  const on = locked();
+  const live = started && !dead && !won && !dying;
+  document.getElementById('hud').style.display = on && live ? 'block' : 'none';
+  document.getElementById('crosshair').style.display = on && live && !player.hiding ? 'block' : 'none';
+  document.getElementById('tracker-wrap').style.display = on && live ? 'block' : 'none';
+  if (on) overlay.style.display = 'none';
+  else if (live) {
+    overlay.innerHTML = `<h1>PAUSED</h1><p>WASD move · SHIFT sprint · C crouch · F lamp<br>E interact · T tracker · SPACE hold breath</p><p style="color:#f66;font-size:20px">► CLICK TO RESUME ◄</p>`;
+    overlay.style.display = 'flex';
+  }
 });
 addEventListener('mousemove', e => {
-  if (document.pointerLockElement !== renderer.domElement || dead || won || dying) return;
-  player.yaw -= e.movementX * 0.0022;
-  player.pitch = Math.max(-1.4, Math.min(1.4, player.pitch - e.movementY * 0.0022));
+  if (!locked() || dead || won || dying || player.ventT > 0) return;
+  const sens = player.hiding ? 0.0007 : 0.0022;
+  player.yaw -= e.movementX * sens;
+  if (player.hiding) {
+    const face = player.hiding.yaw;
+    player.yaw = Math.max(face - 0.35, Math.min(face + 0.35, player.yaw));
+    player.pitch = Math.max(-0.25, Math.min(0.25, player.pitch - e.movementY * sens));
+  } else {
+    player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - e.movementY * sens));
+  }
 });
 
-// ---------- Collision / pathing ----------
-function collide(px, pz, radius) {
-  const r = radius;
-  for (const [ox, oz] of [[r,0],[-r,0],[0,r],[0,-r],[r*.7,r*.7],[-r*.7,r*.7],[r*.7,-r*.7],[-r*.7,-r*.7]]) {
-    const c = Math.floor((px + ox + COLS * CELL / 2) / CELL);
-    const rr = Math.floor((pz + oz + ROWS * CELL / 2) / CELL);
-    if (tileAt(c, rr) === 0) return true;
+function collide(px, pz, deck, radius) {
+  for (const [ox, oz] of [[radius, 0], [-radius, 0], [0, radius], [0, -radius]]) {
+    const g = gridOf(px + ox, pz + oz);
+    if (tileAt(deck, g.c, g.r) !== 1) return true;
   }
   for (const cr of crates) {
-    const half = cr.geometry.parameters.width / 2 + r * 0.8;
-    if (Math.abs(px - cr.position.x) < half && Math.abs(pz - cr.position.z) < half) return true;
+    if (cr.deck !== deck) continue;
+    if (Math.abs(px - cr.mesh.position.x) < cr.half && Math.abs(pz - cr.mesh.position.z) < cr.half) return true;
+  }
+  for (const lk of lockers) {
+    if (lk.deck !== deck || player.hiding === lk) continue;
+    if (Math.abs(px - lk.x) < 0.7 && Math.abs(pz - lk.z) < 0.55) return true;
   }
   return false;
 }
-function moveEntity(pos, dx, dz, radius) {
-  if (!collide(pos.x + dx, pos.z, radius)) pos.x += dx;
-  if (!collide(pos.x, pos.z + dz, radius)) pos.z += dz;
-}
-function randTile() {
-  const c = 1 + Math.floor(Math.random() * (COLS - 2));
-  const r = 1 + Math.floor(Math.random() * (ROWS - 2));
-  return tileAt(c, r) === 1 ? { c, r } : randTile();
+function moveEntity(pos, dx, dz, deck, radius) {
+  if (!collide(pos.x + dx, pos.z, deck, radius)) pos.x += dx;
+  if (!collide(pos.x, pos.z + dz, deck, radius)) pos.z += dz;
 }
 function findPath(from, to) {
-  const fc = Math.floor((from.x + COLS*CELL/2)/CELL), fr = Math.floor((from.z + ROWS*CELL/2)/CELL);
-  const key = (c,r) => c + ',' + r;
-  const prev = new Map([[key(fc,fr), null]]);
-  const q = [[fc,fr]];
-  while (q.length) {
-    const [c,r] = q.shift();
-    if (c === to.c && r === to.r) {
+  const fg = gridOf(from.x, from.z);
+  const key = (d, c, r) => d + ',' + c + ',' + r;
+  const prev = new Map([[key(from.deck, fg.c, fg.r), null]]);
+  const q = [[from.deck, fg.c, fg.r]];
+  let guard = 0;
+  while (q.length && guard++ < 400) {
+    const [d, c, r] = q.shift();
+    if (d === to.deck && c === to.c && r === to.r) {
       const path = [];
-      let node = [c,r];
-      while (prev.get(node[0]+','+node[1]) !== null) {
-        path.unshift(node);
-        node = prev.get(node[0]+','+node[1]);
+      let node = [d, c, r];
+      while (prev.get(node[0] + ',' + node[1] + ',' + node[2]) !== null) {
+        const w = worldOf(node[1], node[2]);
+        path.unshift({ x: w.x, z: w.z, deck: node[0] });
+        node = prev.get(node[0] + ',' + node[1] + ',' + node[2]);
       }
-      return path.map(([cc,rr]) => worldOf(cc,rr));
+      return path;
     }
-    for (const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-      const nc = c+dc, nr = r+dr, nk = key(nc,nr);
-      if (tileAt(nc,nr) === 1 && !prev.has(nk)) { prev.set(nk, [c,r]); q.push([nc,nr]); }
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc, nr = r + dr, nk = key(d, nc, nr);
+      if (tileAt(d, nc, nr) === 1 && !prev.has(nk)) { prev.set(nk, [d, c, r]); q.push([d, nc, nr]); }
+    }
+    if (isStair(c, r) && tileAt(1 - d, c, r) === 1) {
+      const nk = key(1 - d, c, r);
+      if (!prev.has(nk)) { prev.set(nk, [d, c, r]); q.push([1 - d, c, r]); }
     }
   }
   return null;
 }
-function hasLineOfSight(a, b) {
-  for (let i = 1; i < 26; i++) {
-    const t = i / 26;
-    const c = Math.floor((a.x + (b.x - a.x) * t + COLS*CELL/2) / CELL);
-    const r = Math.floor((a.z + (b.z - a.z) * t + ROWS*CELL/2) / CELL);
-    if (tileAt(c, r) === 0) return false;
+function hasLOS(a, b) {
+  if (a.deck !== b.deck) return false;
+  for (let i = 1; i < 24; i++) {
+    const t = i / 24;
+    const g = gridOf(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t);
+    if (tileAt(a.deck, g.c, g.r) !== 1) return false;
   }
   return true;
 }
@@ -624,138 +649,268 @@ function setMsg(text, ms) {
   const el = document.getElementById('msg');
   el.textContent = text;
   clearTimeout(setMsg._t);
-  if (ms) setMsg._t = setTimeout(() => el.textContent = '', ms);
+  if (ms) setMsg._t = setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, ms);
 }
+function setPrompt(text) { document.getElementById('prompt').textContent = text || ''; }
 
-// ---------- Alien AI ----------
-const alien = {
-  pos: alienGroup.position,
-  state: 'patrol',   // patrol | hunt | watch
-  speed: 1.9,
-  huntTimeout: 0,
-  repath: 0,
-  path: [],
-  watchTimer: 0,
-  frozen: false,
-};
-
-// ---------- Horror event director ----------
-let nextScareAt = performance.now() + 9000 + Math.random() * 8000;
-let lightsOutT = 0;
-function scheduleDirector() {
-  const now = performance.now();
-  if (!started || dead || won || now < nextScareAt) return;
-  nextScareAt = now + 16000 + Math.random() * 16000;
-  const roll = Math.random();
-  if (alien.state === 'hunt') return; // don't step on the chase
-  if (roll < 0.22) {
-    // ship-wide lights out
-    lightsOutT = 2 + Math.random() * 2;
-    deepBoom(0.4);
-    setMsg('the power flickers…', 2500);
-  } else if (roll < 0.42) {
-    skitter(Math.random() < 0.5 ? -0.95 : 0.95, Math.random() < 0.5 ? -0.95 : 0.95);
-  } else if (roll < 0.58) {
-    whisper(Math.random() * 2 - 1, 0.11);
-  } else if (roll < 0.74) {
-    deepBoom(0.5);
-    shake = 0.35;
-  } else {
-    // stalker: it appears and watches you, then is gone
-    if (alien.state !== 'patrol') return;
-    alien.state = 'watch';
-    alien.frozen = true;
-    // teleport to a visible spot 2-3 tiles away
-    const pc = Math.floor((player.pos.x + COLS*CELL/2)/CELL);
-    const pr_ = Math.floor((player.pos.z + ROWS*CELL/2)/CELL);
-    const spots = [];
-    for (let r = 1; r < ROWS - 1; r++) for (let c = 1; c < COLS - 1; c++) {
-      if (tileAt(c, r) !== 1) continue;
-      if (Math.abs(c - pc) + Math.abs(r - pr_) === 3) {
-        const w = worldOf(c, r);
-        if (hasLineOfSight(player.pos, new THREE.Vector3(w.x, 1.5, w.z))) spots.push(w);
-      }
-    }
-    if (spots.length === 0) { alien.state = 'patrol'; alien.frozen = false; return; }
-    const s = spots[Math.floor(Math.random() * spots.length)];
-    alien.pos.set(s.x, 0, s.z);
-    alienGroup.rotation.y = Math.atan2(player.pos.x - s.x, player.pos.z - s.z);
-    alien.path = [];
-    alien.watchTimer = 1.8 + Math.random() * 1.4;
-    whisper(panToAlien(), 0.13);
-    setMsg('something is watching you…', 2200);
-  }
-}
-
-// pan alien sounds by real direction relative to camera
 const _v = new THREE.Vector3(), _right = new THREE.Vector3();
-function panToAlien() {
-  _v.copy(alien.pos).sub(player.pos).normalize();
+function panTo(x, z) {
+  _v.set(x - player.pos.x, 0, z - player.pos.z).normalize();
   _right.set(1, 0, 0).applyQuaternion(camera.quaternion);
   return Math.max(-0.95, Math.min(0.95, _v.dot(_right)));
 }
+function dist3(x, z, deck) {
+  const dy = (deck - player.deck) * DECK_H;
+  return Math.hypot(x - player.pos.x, z - player.pos.z, dy);
+}
 
-// ---------- Death ----------
+const alien = {
+  pos: alienMesh.group.position,
+  deck: 1,
+  baseY: DECK_H,
+  state: 'patrol',
+  speed: 1.85,
+  huntTimeout: 0,
+  repath: 0,
+  path: [],
+  ventCd: 8,
+  ventPlan: null,
+  ventT: 0,
+  ventTo: null,
+  stuck: 0,
+  lastX: alienSpawn.x,
+  lastZ: alienSpawn.z,
+  searching: 0,
+  frozen: false,
+};
+let shake = 0, gotCount = 0, heartTimer = 2, klaxonT = 0, clickT = 0, halluT = 2, trackerBeepT = 0.4, lightsOutT = 0;
+let nextScareAt = 0;
+
+function nearestInteract() {
+  if (player.hiding || player.ventT > 0) return null;
+  const g = gridOf(player.pos.x, player.pos.z);
+  let best = null, bestD = 2.1;
+  if (isStair(g.c, g.r) && tileAt(player.deck, g.c, g.r) === 1) {
+    const p = worldOf(g.c, g.r);
+    const d = Math.hypot(player.pos.x - p.x, player.pos.z - p.z);
+    if (d < bestD) { bestD = d; best = { kind: 'stair' }; }
+  }
+  for (const v of vents) {
+    if (v.deck !== player.deck) continue;
+    const d = Math.hypot(player.pos.x - v.x, player.pos.z - v.z);
+    if (d < bestD) { bestD = d; best = { kind: 'vent', vent: v }; }
+  }
+  for (const lk of lockers) {
+    if (lk.deck !== player.deck) continue;
+    const d = Math.hypot(player.pos.x - lk.x, player.pos.z - lk.z);
+    if (d < bestD) { bestD = d; best = { kind: 'locker', locker: lk }; }
+  }
+  return best;
+}
+function interact() {
+  if (player.hiding) {
+    const d = Math.hypot(alien.pos.x - player.hiding.x, alien.pos.z - player.hiding.z);
+    if (alien.deck === player.deck && d < 2.2 && alien.searching > 0) {
+      setMsg('the door will not move', 1200);
+      return;
+    }
+    player.hiding = null;
+    player.noise = Math.min(1, player.noise + 0.35);
+    document.getElementById('locker').style.display = 'none';
+    document.getElementById('crosshair').style.display = 'block';
+    return;
+  }
+  const hit = nearestInteract();
+  if (!hit) return;
+  if (hit.kind === 'stair') {
+    player.deck = 1 - player.deck;
+    player.fade = 0.45;
+    player.noise = Math.min(1, player.noise + 0.3);
+    document.getElementById('deck').textContent = player.deck ? 'UPPER' : 'LOWER';
+    setMsg(player.deck ? 'upper deck — engineering' : 'lower deck — cargo', 1800);
+  } else if (hit.kind === 'vent') {
+    const dest = otherVent(hit.vent);
+    player.ventT = 1.15;
+    player.ventTo = dest;
+    player.fade = 1;
+    player.noise = 1;
+    skitter(-0.9, 0.9);
+    setMsg('crawling…', 1000);
+  } else if (hit.kind === 'locker') {
+    const d = dist3(alien.pos.x, alien.pos.z, alien.deck);
+    if (d < 1.6 && alien.deck === player.deck) { setMsg('too late', 800); return; }
+    player.hiding = hit.locker;
+    player.yaw = hit.locker.yaw;
+    player.pitch = 0;
+    player.crouch = false;
+    document.getElementById('locker').style.display = 'block';
+    document.getElementById('crosshair').style.display = 'none';
+    setMsg('stay still. SPACE holds your breath.', 2200);
+  }
+}
+
 function beginDeath() {
+  if (dying || dead) return;
   dying = true;
-  screech(0.65);
-  deepBoom(0.6);
-  // lock the alien in front of the camera
+  player.hiding = null;
+  document.getElementById('locker').style.display = 'none';
+  if (alien.ventT > 0) { alien.ventT = 0; alienMesh.group.visible = true; }
+  screech(0.6);
+  deepBoom(0.55);
   const f = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
-  alien.pos.set(player.pos.x + f.x * 0.85, 0, player.pos.z + f.z * 0.85);
-  alienGroup.rotation.y = player.yaw + Math.PI;
+  alien.pos.set(player.pos.x + f.x * 0.9, player.deck * DECK_H, player.pos.z + f.z * 0.9);
+  alien.deck = player.deck;
+  alien.baseY = player.deck * DECK_H;
+  alienMesh.group.rotation.y = player.yaw + Math.PI;
   shake = 1.2;
   const fb = document.getElementById('flashblack');
-  setTimeout(() => { fb.style.opacity = 1; }, 450);
+  setTimeout(() => { fb.style.opacity = 1; }, 420);
   setTimeout(() => {
     dead = true;
     document.getElementById('damage').style.opacity = 1;
-    overlay.innerHTML = `<h1 style="color:#f33; text-shadow:0 0 26px #f00">IT TOOK YOU</h1>
-      <p style="color:#a66">You recovered ${gotCount}/5 power cells before it found you.</p>
-      <p style="color:#8f6; margin-top:18px">► CLICK TO RETRY ◄</p>`;
+    overlay.innerHTML = `<h1 style="color:#f33;text-shadow:0 0 26px #f00">IT TOOK YOU</h1>
+      <p style="color:#a66">${gotCount}/5 power cells. Deck: ${player.deck ? 'upper' : 'lower'}.</p>
+      <p style="color:#8f6;margin-top:18px">► CLICK TO RETRY ◄</p>`;
     fb.style.opacity = 0;
     overlay.style.display = 'flex';
     document.getElementById('hud').style.display = 'none';
+    document.getElementById('tracker-wrap').style.display = 'none';
     overlay.addEventListener('click', () => location.reload(), { once: true });
     document.exitPointerLock();
-  }, 1100);
+  }, 1000);
 }
 function win() {
   won = true;
   const secs = ((performance.now() - startedAt) / 1000).toFixed(1);
-  overlay.innerHTML = `<h1 style="color:#6cf; text-shadow:0 0 22px #48f">YOU ESCAPED</h1>
-    <p style="color:#597">The Ymir falls away behind you. In the hold, something scrapes against the escape-pod hatch…<br><br>
-    Time aboard: <b>${secs}s</b>.</p>
-    <p style="color:#8f6; margin-top:18px">► CLICK TO PLAY AGAIN ◄</p>`;
+  overlay.innerHTML = `<h1 style="color:#6cf;text-shadow:0 0 22px #48f">YOU ESCAPED</h1>
+    <p style="color:#597">Both decks fall away behind you. Time aboard: <b>${secs}s</b>.<br>Something is still in the pod's vent.</p>
+    <p style="color:#8f6;margin-top:18px">► CLICK TO PLAY AGAIN ◄</p>`;
   overlay.style.display = 'flex';
   document.getElementById('hud').style.display = 'none';
+  document.getElementById('tracker-wrap').style.display = 'none';
   overlay.addEventListener('click', () => location.reload(), { once: true });
   document.exitPointerLock();
   pickupSfx();
 }
 
-// ---------- Main loop ----------
-const clock = new THREE.Clock();
-let gotCount = 0;
-let heartTimer = 0, klaxonT = 0, shake = 0, clickT = 0, halluT = 0;
+function scheduleDirector() {
+  const now = performance.now();
+  if (now < nextScareAt) return;
+  nextScareAt = now + 14000 + Math.random() * 14000;
+  if (alien.state === 'hunt' || player.hiding) return;
+  const roll = Math.random();
+  if (roll < 0.28) {
+    lightsOutT = 1.6 + Math.random() * 1.8;
+    deepBoom(0.35);
+    setMsg('the power flickers…', 2000);
+  } else if (roll < 0.5) skitter(Math.random() < 0.5 ? -0.95 : 0.95, Math.random() < 0.5 ? 0.9 : -0.9);
+  else if (roll < 0.7) whisper((Math.random() * 2 - 1), 0.1);
+  else { deepBoom(0.45); shake = 0.3; }
+}
 
+function considerVent() {
+  if (alien.ventPlan || alien.ventT > 0 || alien.searching > 0) return;
+  let best = null, bestScore = dist3(alien.pos.x, alien.pos.z, alien.deck);
+  for (const v of vents) {
+    if (v.deck !== alien.deck) continue;
+    const dEnter = Math.hypot(v.x - alien.pos.x, v.z - alien.pos.z);
+    if (dEnter > 22) continue;
+    const exit = otherVent(v);
+    const dExit = dist3(exit.x, exit.z, exit.deck);
+    if (dExit + 5 < bestScore) { bestScore = dExit; best = { enter: v, exit }; }
+  }
+  if (!best) return;
+  const g = gridOf(best.enter.x, best.enter.z);
+  alien.path = findPath(alien, { deck: alien.deck, c: g.c, r: g.r }) || [];
+  alien.ventPlan = best;
+  alien.ventCd = 11 + Math.random() * 7;
+}
+
+const tctx = document.getElementById('tracker').getContext('2d');
+let sweep = 0;
+function drawTracker(dist, sameDeck) {
+  const w = 168, c = 84;
+  sweep += 0.03;
+  tctx.clearRect(0, 0, w, w);
+  tctx.strokeStyle = '#0a3';
+  tctx.globalAlpha = 0.55;
+  tctx.beginPath(); tctx.arc(c, c, 70, 0, Math.PI * 2); tctx.stroke();
+  tctx.beginPath(); tctx.arc(c, c, 40, 0, Math.PI * 2); tctx.stroke();
+  tctx.beginPath(); tctx.moveTo(c, 14); tctx.lineTo(c, 154); tctx.moveTo(14, c); tctx.lineTo(154, c); tctx.stroke();
+  tctx.globalAlpha = 0.18;
+  tctx.fillStyle = '#0f4';
+  tctx.beginPath();
+  tctx.moveTo(c, c);
+  tctx.arc(c, c, 70, sweep - 0.5, sweep);
+  tctx.fill();
+  tctx.globalAlpha = 1;
+  if (trackerOn && dist < 36) {
+    const dx = alien.pos.x - player.pos.x, dz = alien.pos.z - player.pos.z;
+    const rx = dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw);
+    const fz = -(dx * Math.sin(player.yaw) + dz * Math.cos(player.yaw));
+    const scale = 70 / 32;
+    const bx = c + rx * scale, by = c - fz * scale;
+    if (Math.hypot(bx - c, by - c) < 74) {
+      tctx.fillStyle = sameDeck ? '#9f9' : '#ca4';
+      tctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(performance.now() / 80));
+      tctx.beginPath();
+      tctx.arc(bx, by, sameDeck ? 4.5 : 3.5, 0, Math.PI * 2);
+      if (!sameDeck) { tctx.strokeStyle = '#ca4'; tctx.stroke(); }
+      else tctx.fill();
+      tctx.globalAlpha = 1;
+    }
+  }
+  tctx.fillStyle = '#6a6';
+  tctx.font = '10px Courier New';
+  tctx.fillText(trackerOn ? (dist < 36 ? (sameDeck ? '' : 'OTHER DECK') : 'NO CONTACT') : 'OFF', 46, 160);
+}
+
+const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
   if (!started) { renderer.render(scene, camera); return; }
+  if (dead || won || !locked()) { renderer.render(scene, camera); return; }
 
-  if (!dead && !won && !dying) {
-    scheduleDirector();
+  if (nextScareAt === 0) nextScareAt = performance.now() + 8000;
+  scheduleDirector();
+  player.holdingBreath = !!(keys['Space'] && (player.hiding || player.crouch));
+  if (player.holdingBreath) player.breathHold = Math.max(0, player.breathHold - dt);
+  else player.breathHold = Math.min(5.5, player.breathHold + dt * 0.85);
+  if (player.holdingBreath && player.breathHold <= 0) {
+    player.holdingBreath = false;
+    player.noise = 1;
+    breath(true);
+    if (player.hiding && alien.searching > 0) player.exposedT = 1;
+  }
 
-    // --- movement + stamina ---
-    const wantSprint = (keys['ShiftLeft'] || keys['ShiftRight']);
+  if (player.fade > 0) {
+    player.fade = Math.max(0, player.fade - dt);
+    document.getElementById('flashblack').style.opacity = player.fade > 0.2 ? Math.min(1, player.fade) : 0;
+  }
+
+  if (player.ventT > 0) {
+    player.ventT -= dt;
+    document.getElementById('flashblack').style.opacity = 1;
+    if (player.ventT <= 0 && player.ventTo) {
+      player.pos.set(player.ventTo.x, 0, player.ventTo.z + 0.8);
+      player.deck = player.ventTo.deck;
+      document.getElementById('deck').textContent = player.deck ? 'UPPER' : 'LOWER';
+      player.ventTo = null;
+      player.fade = 0.35;
+      document.getElementById('flashblack').style.opacity = 0;
+      setMsg('you drop out of the vent', 1400);
+    }
+  } else if (!player.hiding && !dying) {
+    const wantSprint = keys['ShiftLeft'] || keys['ShiftRight'];
     const moving = keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'];
-    const sprint = wantSprint && player.stamina > 1 && moving;
-    if (sprint) player.stamina = Math.max(0, player.stamina - 22 * dt);
-    else player.stamina = Math.min(100, player.stamina + (moving ? 6 : 13) * dt);
-    const exhausted = player.stamina < 12;
-    const speed = sprint ? 6.0 : 3.1;
+    player.crouchBlend += ((player.crouch ? 1 : 0) - player.crouchBlend) * Math.min(1, dt * 8);
+    const sprint = wantSprint && !player.crouch && player.stamina > 1 && moving;
+    if (sprint) player.stamina = Math.max(0, player.stamina - 20 * dt);
+    else player.stamina = Math.min(100, player.stamina + (moving ? 7 : 12) * dt);
+    const exhausted = player.stamina < 10;
+    const speed = (sprint ? 5.6 : 3.05) * (1 - player.crouchBlend * 0.48);
     let mx = 0, mz = 0;
     const f = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
     const rv = { x: Math.cos(player.yaw), z: -Math.sin(player.yaw) };
@@ -764,224 +919,281 @@ function animate() {
     if (keys['KeyD']) { mx += rv.x; mz += rv.z; }
     if (keys['KeyA']) { mx -= rv.x; mz -= rv.z; }
     const len = Math.hypot(mx, mz) || 1;
-    moveEntity(player.pos, mx / len * speed * dt, mz / len * speed * dt, 0.45);
-    player.noise = moving ? (sprint ? 1.0 : 0.42) : 0.1;
-    if (!lampOn) player.noise *= 0.72;
-    if (exhausted) player.noise += 0.25;
+    moveEntity(player.pos, mx / len * speed * dt, mz / len * speed * dt, player.deck, 0.42);
+    player.noise = moving ? (sprint ? 1 : 0.4) : 0.08;
+    player.noise *= 1 - player.crouchBlend * 0.62;
+    if (!lampOn) player.noise *= 0.7;
+    if (exhausted) player.noise += 0.22;
+    if (player.holdingBreath) player.noise *= 0.45;
+    document.getElementById('stance').textContent = player.crouch ? 'CROUCH' : 'STAND';
+  } else if (player.hiding && !dying) {
+    player.noise = (keys['KeyW'] || keys['KeyA'] || keys['KeyS'] || keys['KeyD']) ? 0.85 : 0.04;
+    if (!player.holdingBreath) player.noise += 0.12;
+    if (player.holdingBreath) player.noise *= 0.3;
+  }
 
-    // breathing
+  if (!dying) {
     player.breathT -= dt;
-    if (player.breathT <= 0) {
-      const harsh = exhausted || player.fear > 0.6;
-      if (harsh || moving) breath(harsh);
-      player.breathT = harsh ? 2.1 : 3.4;
+    const harsh = player.stamina < 10 || player.fear > 0.65;
+    if (player.breathT <= 0 && !player.holdingBreath && (harsh || player.noise > 0.3)) {
+      breath(harsh);
+      player.breathT = harsh ? 2.2 : 3.6;
     }
-
-    camera.position.copy(player.pos);
-    camera.position.y = 1.62 + (moving ? Math.sin(t * (sprint ? 13 : 9)) * (sprint ? 0.07 : 0.04) : Math.sin(t * 1.6) * 0.012);
+    const eye = 1.58 - player.crouchBlend * 0.7;
+    const bob = player.hiding ? 0 : Math.sin(t * 9) * (player.noise > 0.3 ? 0.035 : 0.01);
+    camera.position.set(player.pos.x, player.deck * DECK_H + eye + bob, player.pos.z);
+    if (player.hiding) {
+      camera.position.x = player.hiding.x - Math.sin(player.hiding.yaw) * 0.15;
+      camera.position.z = player.hiding.z - Math.cos(player.hiding.yaw) * 0.15;
+      camera.position.y = player.deck * DECK_H + 1.55;
+    }
     camera.rotation.set(0, 0, 0);
     camera.rotateY(player.yaw);
     camera.rotateX(player.pitch);
   }
-
-  // camera shake
+  flash.intensity = lampOn && player.ventT <= 0 && !player.hiding ? 20 : (player.hiding ? 0.4 : 0);
   if (shake > 0) {
-    shake = Math.max(0, shake - dt * 1.6);
-    camera.position.x += (Math.random() - 0.5) * shake * 0.25;
-    camera.position.y += (Math.random() - 0.5) * shake * 0.2;
-    camera.rotation.z += (Math.random() - 0.5) * shake * 0.05;
+    shake = Math.max(0, shake - dt * 1.5);
+    camera.position.x += (Math.random() - 0.5) * shake * 0.22;
+    camera.position.y += (Math.random() - 0.5) * shake * 0.16;
   }
-  if (alien.state === 'hunt' && !dead && !won) shake = Math.max(shake, 0.12);
 
-  // --- flicker lights + lights-out events ---
   if (lightsOutT > 0) lightsOutT -= dt;
   for (const fl of flickers) {
     fl.t += dt;
-    let base = fl.dead ? fl.base * 0.12 : fl.base;
-    if (lightsOutT > 0) base = 0;
-    const n = Math.sin(fl.t * 13) * Math.sin(fl.t * 7.3 + 2);
-    fl.light.intensity = (n > -0.55 ? base : base * 0.1) * (0.75 + Math.random() * 0.3);
+    const base = lightsOutT > 0 ? 0 : (fl.dead ? fl.base * 0.1 : fl.base);
+    const n = Math.sin(fl.t * 11) * Math.sin(fl.t * 6.4);
+    fl.light.intensity = (n > -0.55 ? base : base * 0.08) * (0.8 + Math.random() * 0.25);
   }
-  if (lightsOutT > 0) player.fear = Math.min(1, player.fear + dt * 0.25);
 
-  // --- cells ---
+  const hit = nearestInteract();
+  if (player.hiding) setPrompt(alien.searching > 0 ? 'SPACE — hold breath' : 'E — leave locker');
+  else if (hit?.kind === 'stair') setPrompt(player.deck === 0 ? 'E — climb to upper deck' : 'E — descend');
+  else if (hit?.kind === 'vent') setPrompt('E — crawl into vent');
+  else if (hit?.kind === 'locker') setPrompt('E — hide in locker');
+  else setPrompt('');
+
   for (const c of cells) {
     if (c.got) continue;
     c.t += dt;
     c.mesh.rotation.y += dt * 2;
-    c.mesh.position.y = 1.1 + Math.sin(c.t * 2.5) * 0.14;
-    if (!dead && !won && !dying && c.mesh.position.distanceTo(player.pos) < 1.3) {
+    c.mesh.position.y = c.deck * DECK_H + 1.1 + Math.sin(c.t * 2.4) * 0.12;
+    c.light.position.copy(c.mesh.position);
+    if (!dying && c.deck === player.deck && c.mesh.position.distanceTo(camera.position) < 1.45) {
       c.got = true;
       scene.remove(c.mesh); scene.remove(c.light);
       gotCount++;
       document.getElementById('cells').textContent = gotCount;
       pickupSfx();
-      player.fear = Math.max(0, player.fear - 0.2);
+      player.fear = Math.max(0, player.fear - 0.15);
+      player.noise = 1;
       if (gotCount === 5) {
         exitMat.emissive.set(0x22ff44);
         exitLight.color.set(0x22ff44);
-        setMsg('ESCAPE BAY UNLOCKED — RUN', 5000);
-        // it knows you're leaving
+        setMsg('ESCAPE BAY UNLOCKED — it knows', 5000);
         alien.state = 'hunt';
         alien.huntTimeout = 999;
-        screech(0.25);
-      } else {
-        setMsg(`POWER CELL RECOVERED (${gotCount}/5) — it heard that`, 2800);
-        // collecting is loud
-        player.noise = 1;
-        if (alien.state === 'patrol' && Math.random() < 0.6) {
-          const pc = Math.floor((player.pos.x + COLS*CELL/2)/CELL);
-          const pr_ = Math.floor((player.pos.z + ROWS*CELL/2)/CELL);
-          alien.path = findPath(alien.pos, { c: pc, r: pr_ }) || [];
-        }
-      }
+        screech(0.22);
+      } else setMsg(`POWER CELL ${gotCount}/5 — it heard that`, 2400);
     }
   }
-  exitLight.intensity = 1.6 + Math.sin(t * 4) * 0.9;
+  exitLight.intensity = 1.5 + Math.sin(t * 4) * 0.8;
 
-  // --- alien AI ---
-  const distToPlayer = alien.pos.distanceTo(player.pos);
-  if (!dead && !won && !dying) {
-    const los = distToPlayer < 30 && hasLineOfSight(alien.pos.clone().setY(1.6), player.pos.clone().setY(1.6));
-    const senses = 20 * player.noise + (lampOn ? 7 : 0);
-
-    if (alien.state === 'watch') {
-      alien.watchTimer -= dt;
-      if (alien.watchTimer <= 0) {
-        // vanish: teleport far away, back to patrol
-        const far = randTile();
-        alien.path = findPath(alien.pos, far) || [];
-        // instant relocation trick: it's simply elsewhere now
-        const w = worldOf(far.c, far.r);
-        alien.pos.set(w.x, 0, w.z);
-        alien.state = 'patrol';
-        alien.frozen = false;
-        alien.repath = 2;
-        player.fear = Math.min(1, player.fear + 0.3);
-      }
-    } else if ((los && distToPlayer < senses + 5) || distToPlayer < 3) {
-      if (alien.state !== 'hunt') { screech(); setMsg('!! IT SEES YOU !!', 1800); shake = 0.5; }
+  const dist = dist3(alien.pos.x, alien.pos.z, alien.deck);
+  const sameDeck = alien.deck === player.deck;
+  const xz = Math.hypot(alien.pos.x - player.pos.x, alien.pos.z - player.pos.z);
+  if (!dying) {
+    const los = sameDeck && xz < 28 && hasLOS(
+      { x: alien.pos.x, z: alien.pos.z, deck: alien.deck },
+      { x: player.pos.x, z: player.pos.z, deck: player.deck }
+    );
+    const senses = 16 * player.noise + (lampOn && !player.hiding ? 5 : 0) + (trackerOn && dist < 14 ? 2.5 : 0);
+    if (alien.searching > 0 && !player.hiding) {
+      alien.searching = 0;
+      alien.frozen = false;
       alien.state = 'hunt';
-      alien.huntTimeout = 4.5;
+      alien.huntTimeout = 4;
+      setMsg('it heard the locker open', 1400);
+    } else if (player.hiding && sameDeck && xz < 4.5) {
+      if (alien.searching <= 0) {
+        alien.searching = 4.2;
+        alien.state = 'hunt';
+        setMsg('it is at the locker', 2000);
+        whisper(0, 0.12);
+      }
+    } else if (!player.hiding && ((los && xz < senses + 4) || (sameDeck && xz < 2.6))) {
+      if (alien.state !== 'hunt') { screech(); setMsg('!! IT SEES YOU !!', 1600); shake = 0.45; }
+      alien.state = 'hunt';
+      alien.huntTimeout = 5;
     }
+    if (alien.searching > 0) {
+      alien.searching -= dt;
+      alien.frozen = true;
+      const lk = player.hiding;
+      if (lk) {
+        alien.pos.x += (lk.x + Math.sin(lk.yaw) * 1.3 - alien.pos.x) * Math.min(1, dt * 2);
+        alien.pos.z += (lk.z + Math.cos(lk.yaw) * 1.3 - alien.pos.z) * Math.min(1, dt * 2);
+        alienMesh.group.rotation.y = lk.yaw + Math.PI;
+      }
+      if (trackerOn) player.noise += 0.18;
+      const loud = player.noise > 0.25 || player.exposedT > 0.65;
+      if (loud) player.exposedT += dt; else player.exposedT = Math.max(0, player.exposedT - dt);
+      if (player.exposedT > 1.15) beginDeath();
+      if (alien.searching <= 0) {
+        alien.frozen = false;
+        alien.state = 'patrol';
+        alien.huntTimeout = 0;
+        alien.path = findPath(alien, { deck: alien.deck, ...randTile(alien.deck) }) || [];
+        setMsg('it moves on', 1400);
+        player.fear = Math.max(0, player.fear - 0.2);
+      }
+    } else alien.frozen = false;
+
     alien.huntTimeout -= dt;
     alien.repath -= dt;
+    alien.ventCd -= dt;
+    if (alien.ventCd <= 0 && alien.state === 'hunt' && dist > 8) considerVent();
 
-    if (alien.state === 'hunt') {
-      alien.speed = 4.9;
-      klaxonT -= dt;
-      if (klaxonT <= 0) { klaxonThump(); klaxonT = 0.55; }
-      if (alien.huntTimeout <= 0 && distToPlayer > 11) {
-        alien.state = 'patrol';
-        alien.path = findPath(alien.pos, randTile()) || [];
+    if (alien.ventT > 0) {
+      alien.ventT -= dt;
+      alienMesh.group.visible = false;
+      if (alien.ventT <= 0 && alien.ventTo) {
+        alien.pos.set(alien.ventTo.x, alien.ventTo.deck * DECK_H, alien.ventTo.z);
+        alien.deck = alien.ventTo.deck;
+        alien.baseY = alien.deck * DECK_H;
+        alien.ventTo = null;
+        alien.ventPlan = null;
+        alienMesh.group.visible = true;
+        skitter(panTo(alien.pos.x, alien.pos.z), panTo(player.pos.x, player.pos.z));
+        setMsg('the grate ahead of you shifts', 1600);
       }
-      if (alien.repath <= 0) {
-        const pc = Math.floor((player.pos.x + COLS*CELL/2)/CELL);
-        const pr_ = Math.floor((player.pos.z + ROWS*CELL/2)/CELL);
-        alien.path = findPath(alien.pos, { c: pc, r: pr_ }) || [];
-        alien.repath = 0.5;
+    } else if (!alien.frozen) {
+      if (alien.state === 'hunt') {
+        alien.speed = 4.35;
+        klaxonT -= dt;
+        if (klaxonT <= 0 && sameDeck) { klaxonThump(); klaxonT = 0.6; }
+        if (alien.huntTimeout <= 0 && dist > 12 && gotCount < 5) {
+          alien.state = 'patrol';
+          alien.path = [];
+        }
+        if (alien.repath <= 0 && !alien.ventPlan) {
+          const g = gridOf(player.pos.x, player.pos.z);
+          alien.path = findPath(alien, { deck: player.deck, c: g.c, r: g.r }) || [];
+          alien.repath = 0.55;
+        }
+      } else if (alien.path.length === 0 && alien.repath <= 0) {
+        const rt = randTile(Math.random() < 0.35 ? 1 - alien.deck : alien.deck);
+        alien.path = findPath(alien, { deck: rt.deck, c: rt.c, r: rt.r }) || [];
+        alien.repath = 2.2;
+        alien.speed = 1.85;
       }
-    } else if (alien.state === 'patrol') {
-      alien.speed = 1.9;
-      if (alien.path.length === 0 && alien.repath <= 0) {
-        alien.path = findPath(alien.pos, randTile()) || [];
-        alien.repath = 2.5;
+      if (alien.ventPlan) {
+        const dEnter = Math.hypot(alien.ventPlan.enter.x - alien.pos.x, alien.ventPlan.enter.z - alien.pos.z);
+        if (dEnter < 1.3 && alien.deck === alien.ventPlan.enter.deck) {
+          alien.ventT = 0.85;
+          alien.ventTo = alien.ventPlan.exit;
+          alien.path = [];
+          skitter(-0.7, 0.7);
+        }
       }
-    }
-
-    if (!alien.frozen && alien.path.length) {
-      const wp = alien.path[0];
-      const dx = wp.x - alien.pos.x, dz = wp.z - alien.pos.z;
-      const d = Math.hypot(dx, dz);
-      if (d < 0.6) alien.path.shift();
-      else {
-        moveEntity(alien.pos, dx / d * alien.speed * dt, dz / d * alien.speed * dt, 0.4);
-        alienGroup.rotation.y = Math.atan2(dx, dz);
+      if (alien.path.length && alien.ventT <= 0) {
+        const wp = alien.path[0];
+        const dx = wp.x - alien.pos.x, dz = wp.z - alien.pos.z;
+        const d = Math.hypot(dx, dz);
+        if (wp.deck !== alien.deck && d < 1.4) {
+          alien.deck = wp.deck;
+          alien.baseY = alien.deck * DECK_H;
+          alien.path.shift();
+        } else if (d < 0.55) alien.path.shift();
+        else {
+          const step = alien.speed * dt;
+          alien.pos.x += dx / d * step;
+          alien.pos.z += dz / d * step;
+          alienMesh.group.rotation.y = Math.atan2(dx, dz);
+        }
       }
-      // clicking footsteps
+      const moved = Math.hypot(alien.pos.x - alien.lastX, alien.pos.z - alien.lastZ);
+      if (moved < 0.02) alien.stuck += dt; else alien.stuck = 0;
+      alien.lastX = alien.pos.x; alien.lastZ = alien.pos.z;
+      if (alien.stuck > 1.8) {
+        alien.stuck = 0;
+        alien.path = [];
+        alien.ventPlan = null;
+        alien.repath = 0;
+      }
       clickT -= dt;
-      if (clickT <= 0) {
-        alienClick(distToPlayer, panToAlien());
-        clickT = alien.state === 'hunt' ? 0.14 : 0.34;
+      if (clickT <= 0 && sameDeck) {
+        alienClick(Math.max(2, xz), panTo(alien.pos.x, alien.pos.z));
+        clickT = alien.state === 'hunt' ? 0.16 : 0.38;
       }
     }
-    // vent hiss follows the alien — you can hear it coming
-    ventPanner.pan.value = panToAlien();
-    ventGain.gain.value = 0.008 + Math.max(0, 1 - distToPlayer / 22) * 0.05;
+    ventPanner.pan.value = panTo(alien.pos.x, alien.pos.z);
+    ventGain.gain.value = 0.008 + Math.max(0, 1 - dist / 24) * 0.045;
 
-    // fear model
-    let fearDelta = -0.045 * dt;
-    if (los && distToPlayer < 15) fearDelta += (1 - distToPlayer / 15) * dt * 0.55;
-    if (!lampOn) fearDelta += dt * 0.03;
-    if (alien.state === 'hunt') fearDelta += dt * 0.3;
+    let fearDelta = -0.04 * dt;
+    if (los && xz < 16) fearDelta += (1 - xz / 16) * dt * 0.5;
+    if (!lampOn) fearDelta += dt * 0.025;
+    if (alien.state === 'hunt') fearDelta += dt * 0.22;
+    if (player.hiding && alien.searching > 0) fearDelta += dt * 0.35;
     player.fear = Math.max(0, Math.min(1, player.fear + fearDelta));
 
-    // hallucinations at high dread
     halluT -= dt;
-    if (player.fear > 0.72 && halluT <= 0 && alien.state !== 'hunt') {
-      halluT = 2.5 + Math.random() * 4;
-      const f2 = { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
-      shadowAlien.position.set(player.pos.x + f2.x * 6 + (Math.random()-0.5)*4, 0, player.pos.z + f2.z * 6 + (Math.random()-0.5)*4);
-      shadowAlien.lookAt(player.pos.x, 1, player.pos.z);
+    if (player.fear > 0.72 && halluT <= 0 && alien.state !== 'hunt' && !player.hiding) {
+      halluT = 3 + Math.random() * 4;
+      const f2x = -Math.sin(player.yaw), f2z = -Math.cos(player.yaw);
+      shadowAlien.position.set(player.pos.x + f2x * 6, player.deck * DECK_H, player.pos.z + f2z * 6);
       shadowAlien.visible = true;
-      whisper((Math.random() - 0.5) * 1.8, 0.1);
-      setTimeout(() => shadowAlien.visible = false, 120 + Math.random() * 200);
-    }
-    if (player.fear > 0.85 && Math.random() < dt * 0.4) {
-      camera.rotation.z += (Math.random() - 0.5) * 0.03;
+      whisper((Math.random() - 0.5) * 1.6, 0.08);
+      setTimeout(() => { shadowAlien.visible = false; }, 140);
     }
   }
 
-  // alien idle animation
-  if (!alien.frozen) {
-    alienGroup.position.y = Math.abs(Math.sin(t * (alien.state === 'hunt' ? 10 : 4))) * 0.09;
-    limbs[0].rotation.x = Math.sin(t * 6) * 0.45;
-    limbs[1].rotation.x = -Math.sin(t * 6) * 0.45;
-    tail.rotation.z = Math.sin(t * 2) * 0.2;
-    headGrp.rotation.y = Math.sin(t * 1.1) * 0.35;
-  } else {
-    alienGroup.position.y = 0;
-    headGrp.rotation.y = 0;
+  alien.pos.y = alien.baseY;
+  if (alien.ventT <= 0) {
+    alienMesh.group.position.y = alien.baseY + (alien.frozen ? 0 : Math.abs(Math.sin(t * (alien.state === 'hunt' ? 9 : 3.5))) * 0.08);
+    alienMesh.limbs[0].rotation.x = Math.sin(t * 6) * 0.4;
+    alienMesh.limbs[1].rotation.x = -Math.sin(t * 6) * 0.4;
+    alienMesh.eyeMat.emissiveIntensity = 2 + player.fear * 2 + (alien.searching > 0 ? 2 : 0);
   }
-  // eyes pulse subtly with dread
-  eyeMat.emissiveIntensity = 2.2 + player.fear * 2.5 + Math.sin(t * 7) * 0.4;
+  if (alien.state === 'hunt' && sameDeck && !dead) {
+    klaxon.intensity = 2 + Math.sin(t * 9) * 2;
+    klaxon.position.set(player.pos.x, player.deck * DECK_H + 2.8, player.pos.z);
+    shake = Math.max(shake, 0.08);
+  } else klaxon.intensity *= 0.9;
 
-  // klaxon light rides near the player while hunted
-  if (alien.state === 'hunt' && !dead && !won) {
-    klaxon.intensity = 2.5 + Math.sin(t * 9) * 2.5;
-    klaxon.position.set(player.pos.x, 3, player.pos.z);
-  } else {
-    klaxon.intensity *= 0.95;
-  }
-
-  // heartbeat
   heartTimer -= dt;
-  if (!dead && !won && distToPlayer < 13 && heartTimer <= 0) {
-    heartbeat(Math.max(0.28, distToPlayer / 13));
-    heartTimer = Math.max(0.32, distToPlayer / 11) * 0.9;
+  if (dist < 14 && heartTimer <= 0 && !dying) {
+    heartbeat(Math.max(0.28, dist / 14));
+    heartTimer = Math.max(0.32, dist / 12);
   }
+  trackerBeepT -= dt;
+  if (trackerOn && dist < 34 && trackerBeepT <= 0 && !dying) {
+    trackerBeep(dist < 8 && sameDeck);
+    trackerBeepT = 0.16 + Math.min(1.5, dist / 22);
+    if (dist < 12) player.noise = Math.min(1, player.noise + 0.05);
+  }
+  drawTracker(dist, sameDeck);
 
-  // HUD
-  if (!dead && !won) {
+  if (!dying) {
     document.getElementById('stambar').style.width = player.stamina + '%';
     document.getElementById('fearfill').style.width = (player.fear * 100) + '%';
+    document.getElementById('breathfill').style.width = (player.breathHold / 5.5 * 100) + '%';
     const proxEl = document.getElementById('prox');
-    proxEl.textContent = distToPlayer < 6 ? '⚠ CLOSE' : (distToPlayer < 13 ? '…near' : '—');
-    proxEl.style.color = distToPlayer < 6 ? '#f44' : (distToPlayer < 13 ? '#fc6' : '#8f6');
+    proxEl.textContent = dist < 6 && sameDeck ? '⚠ CLOSE' : (dist < 14 ? (sameDeck ? '…near' : 'other deck') : '—');
+    proxEl.style.color = dist < 6 && sameDeck ? '#f44' : (dist < 14 ? '#fc6' : '#8f6');
     document.getElementById('damage').style.opacity =
-      dying ? Math.min(1, parseFloat(document.getElementById('damage').style.opacity || 0) + dt * 2)
-      : (alien.state === 'hunt' && distToPlayer < 9 ? (1 - distToPlayer / 9) * 0.55
-         : player.fear > 0.8 ? 0.12 : 0);
+      (alien.state === 'hunt' && sameDeck && xz < 8) ? (1 - xz / 8) * 0.45 : (player.fear > 0.85 ? 0.1 : 0);
   }
 
-  // death / win triggers
-  if (!dead && !won && !dying && distToPlayer < 1.5) beginDeath();
-  if (!dead && !won && !dying && gotCount === 5) {
-    const dx = player.pos.x - exitDoor.position.x, dz = player.pos.z - exitDoor.position.z;
-    if (Math.hypot(dx, dz) < 2.2) win();
-  }
+  if (!dying && !player.hiding && sameDeck && xz < 1.35 && alien.ventT <= 0) beginDeath();
+  if (!dying && gotCount === 5 && player.deck === 0 && Math.hypot(player.pos.x - exitDoor.position.x, player.pos.z - exitDoor.position.z) < 2.1) win();
 
   renderer.render(scene, camera);
+}
+function randTile(deck) {
+  const c = 1 + Math.floor(Math.random() * 7);
+  const r = 1 + Math.floor(Math.random() * 7);
+  return tileAt(deck, c, r) === 1 ? { deck, c, r } : randTile(deck);
 }
 animate();
 addEventListener('resize', () => {
